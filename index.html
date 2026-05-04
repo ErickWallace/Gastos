@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #141720;
+    --surface2: #1c2030;
+    --border: #242840;
+    --accent: #7cffd4;
+    --accent2: #ff6b6b;
+    --accent3: #ffd166;
+    --accent4: #6b9fff;
+    --text: #e8ecf4;
+    --text2: #7a8099;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; right: -200px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(124,255,212,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,15,20,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px; background: var(--accent);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .header-title { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; }
+  .header-subtitle { font-size: 11px; color: var(--text2); font-family: var(--font-mono); margin-top: 1px; }
+
+  .btn-refresh {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--accent);
+    padding: 8px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 11px;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-refresh:hover { background: var(--accent); color: var(--bg); }
+  .btn-refresh.loading .icon-refresh { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* LAYOUT */
+  main { padding: 20px 16px 40px; max-width: 640px; margin: 0 auto; position: relative; z-index: 1; }
+
+  .section-label {
+    font-family: var(--font-mono); font-size: 10px; color: var(--text2);
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; margin-top: 28px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* STATUS */
+  #status-banner {
+    display: none; padding: 12px 16px; border-radius: var(--radius-sm);
+    margin-bottom: 20px; font-size: 12px; font-family: var(--font-mono);
+    border: 1px solid; animation: fadeIn 0.3s ease;
+  }
+  #status-banner.error { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--red); }
+  #status-banner.info { background: rgba(124,255,212,0.06); border-color: rgba(124,255,212,0.2); color: var(--accent); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* HERO */
+  .hero-card {
+    background: linear-gradient(135deg, #141720 0%, #1a1f2e 100%);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px 20px; margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  .hero-card::before {
+    content: ''; position: absolute; bottom: -40px; right: -40px;
+    width: 150px; height: 150px;
+    background: radial-gradient(circle, rgba(124,255,212,0.08) 0%, transparent 70%);
+  }
+  .hero-label { font-family: var(--font-mono); font-size: 10px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase; }
+  .hero-value { font-size: 36px; font-weight: 800; letter-spacing: -1px; margin: 6px 0 4px; font-family: var(--font-display); }
+  .hero-value.positive { color: var(--accent); }
+  .hero-value.warning { color: var(--yellow); }
+  .hero-value.danger { color: var(--red); }
+  .hero-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text2); }
+  .hero-meta strong { color: var(--text); }
+
+  /* PROGRESS */
+  .progress-wrap { margin-top: 18px; }
+  .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .progress-info-label { font-size: 12px; color: var(--text2); font-family: var(--font-mono); }
+  .progress-pct { font-size: 13px; font-weight: 700; font-family: var(--font-mono); }
+  .progress-pct.ok { color: var(--green); }
+  .progress-pct.warn { color: var(--yellow); }
+  .progress-pct.danger { color: var(--red); }
+  .progress-bar-bg { height: 8px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 99px; transition: width 1s cubic-bezier(0.4,0,0.2,1); width: 0%; }
+  .progress-bar-fill.ok { background: linear-gradient(90deg, var(--green), var(--accent)); }
+  .progress-bar-fill.warn { background: linear-gradient(90deg, var(--yellow), #ffa500); }
+  .progress-bar-fill.danger { background: linear-gradient(90deg, var(--red), #ff8c00); }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 16px 14px; transition: transform 0.2s;
+  }
+  .stat-card:active { transform: scale(0.98); }
+  .stat-label { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-size: 16px; font-weight: 700; font-family: var(--font-mono); }
+  .stat-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text2); margin-top: 4px; }
+  .stat-icon { font-size: 18px; margin-bottom: 6px; }
+
+  /* CHARTS */
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 16px;
+  }
+  .chart-title { font-size: 10px; font-weight: 700; margin-bottom: 16px; color: var(--text2); font-family: var(--font-mono); letter-spacing: 1.5px; text-transform: uppercase; }
+  .chart-wrap.pie-wrap { max-width: 220px; margin: 0 auto; }
+  .chart-wrap.bar-wrap { height: 210px; }
+  .charts-col { display: flex; flex-direction: column; gap: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--text2); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* TABELA */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .expense-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
+  .expense-table th { text-align: left; padding: 10px 12px; color: var(--text2); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .expense-table td { padding: 10px 12px; border-bottom: 1px solid rgba(36,40,64,0.5); white-space: nowrap; }
+  .expense-table tr:last-child td { border-bottom: none; }
+  .expense-table tr.over-budget td { background: rgba(239,68,68,0.04); }
+  .expense-table tr.over-budget .real-val { color: var(--red); }
+
+  .tipo-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .tipo-badge.fixo { background: rgba(107,159,255,0.15); color: var(--accent4); }
+  .tipo-badge.variavel { background: rgba(255,209,102,0.15); color: var(--accent3); }
+  .tipo-badge.automatico { background: rgba(124,255,212,0.15); color: var(--accent); }
+  .tipo-badge.outro { background: rgba(255,107,107,0.15); color: var(--accent2); }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text2); font-family: var(--font-mono); font-size: 12px; }
+
+  /* INSIGHTS */
+  .insights-list { display: flex; flex-direction: column; gap: 10px; }
+  .insight-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; }
+  .insight-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .insight-text { font-size: 13px; line-height: 1.55; color: var(--text); }
+  .insight-text strong { color: var(--accent); }
+  .insight-text .warn { color: var(--yellow); }
+  .insight-text .danger { color: var(--red); }
+
+  /* SKELETON */
+  .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .sk-line { height: 13px; margin: 5px 0; }
+  .sk-val { height: 32px; width: 55%; margin: 8px 0; }
+
+  footer { text-align: center; padding: 20px; font-family: var(--font-mono); font-size: 10px; color: var(--text2); border-top: 1px solid var(--border); max-width: 640px; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-icon">💰</div>
+    <div>
+      <div class="header-title">Finanças</div>
+      <div class="header-subtitle" id="last-update">—</div>
+    </div>
+  </div>
+  <button class="btn-refresh" id="btn-refresh" onclick="loadData()">
+    <span class="icon-refresh">↻</span> Atualizar
+  </button>
+</header>
+
+<main>
+
+  <div id="status-banner"></div>
+
+  <!-- 1. SALDO HERO -->
+  <div class="section-label">Saldo disponível</div>
+  <div class="hero-card">
+    <div class="hero-label">QUANTO AINDA POSSO GASTAR</div>
+    <div class="hero-value positive" id="hero-saldo"><div class="sk-val skeleton"></div></div>
+    <div class="hero-meta" id="hero-meta"><div class="sk-line skeleton" style="width:70%"></div></div>
+    <div class="progress-wrap">
+      <div class="progress-info">
+        <span class="progress-info-label">orçamento utilizado</span>
+        <span class="progress-pct ok" id="progress-pct">—</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill ok" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📋</div>
+      <div class="stat-label">Total Orçado</div>
+      <div class="stat-value" id="stat-orcado"><div class="sk-line skeleton"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💸</div>
+      <div class="stat-label">Total Realizado</div>
+      <div class="stat-value" id="stat-realizado"><div class="sk-line skeleton"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📅</div>
+      <div class="stat-label">Média Diária Restante</div>
+      <div class="stat-value" id="stat-media"><div class="sk-line skeleton"></div></div>
+      <div class="stat-sub" id="stat-dias"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🔮</div>
+      <div class="stat-label">Previsão Final</div>
+      <div class="stat-value" id="stat-previsao"><div class="sk-line skeleton"></div></div>
+      <div class="stat-sub" id="stat-previsao-sub"></div>
+    </div>
+  </div>
+
+  <!-- 3. GRÁFICOS -->
+  <div class="section-label">Gráficos</div>
+  <div class="charts-col">
+    <div class="chart-card">
+      <div class="chart-title">Orçado vs Realizado por Categoria</div>
+      <div class="chart-wrap bar-wrap">
+        <canvas id="chart-bar"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Distribuição por Tipo</div>
+      <div class="chart-wrap pie-wrap">
+        <canvas id="chart-pie"></canvas>
+      </div>
+      <div class="legend" id="pie-legend"></div>
+    </div>
+  </div>
+
+  <!-- 4. TABELA -->
+  <div class="section-label">Detalhamento</div>
+  <div class="chart-card">
+    <div class="table-wrap">
+      <table class="expense-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Categoria</th>
+            <th>Orçado</th>
+            <th>Realizado</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="4" class="empty-state">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 5. INSIGHTS -->
+  <div class="section-label">Insights</div>
+  <div class="insights-list" id="insights-list">
+    <div class="insight-card">
+      <div class="insight-icon">⏳</div>
+      <div class="insight-text">
+        <div class="sk-line skeleton"></div>
+        <div class="sk-line skeleton" style="width:75%;margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>Dados carregados da planilha via Google Apps Script</footer>
+
+<script>
+// =====================================================
+// ⚙️  CONFIGURAÇÃO
+// Cole abaixo a URL gerada ao publicar o Apps Script como Web App
+// Extensões → Apps Script → Implantar → Nova implantação → App da Web
+// =====================================================
+const API_URL = 'https://script.google.com/macros/s/AKfycbw962WKbh1aUs_jj-pwMbCQ8jgjnOUU16BSySzGrzJb0705Ge8-Znn-_5oC7R3e6PNp/exec'; // 👈 Cole sua URL aqui
+// =====================================================
+
+let chartBar = null, chartPie = null;
+
+const fmt = v => 'R$ ' + parseFloat(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function showStatus(msg, type = 'info') {
+  const el = document.getElementById('status-banner');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'block';
+  if (type === 'info') setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+async function loadData() {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('loading');
+
+  if (!API_URL) {
+    showStatus('⚠️ Configure a variável API_URL no código para carregar dados reais. Exibindo modo demo.', 'error');
+    btn.classList.remove('loading');
+    renderDemo();
+    return;
+  }
+
+  try {
+    const res = await fetch(API_URL + (API_URL.includes('?') ? '&' : '?') + 'cb=' + Date.now(), { mode: 'cors' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderAll(data);
+    document.getElementById('status-banner').style.display = 'none';
+  } catch (err) {
+    showStatus('❌ Erro: ' + err.message + '. Exibindo demo.', 'error');
+    renderDemo();
+  } finally {
+    btn.classList.remove('loading');
+  }
+}
+
+function renderDemo() {
+  renderAll({
+    resumo: { orcado: 3200, realizado: 2100, saldo: 1100, percentual: 66 },
+    tipos: { fixo: 1200, variavel: 600, automatico: 300 },
+    categorias: [
+      { nome: 'Alimentação', orcado: 800, realizado: 650 },
+      { nome: 'Transporte', orcado: 400, realizado: 320 },
+      { nome: 'Moradia', orcado: 1000, realizado: 1000 },
+      { nome: 'Lazer', orcado: 300, realizado: 340 },
+      { nome: 'Saúde', orcado: 200, realizado: 0 },
+      { nome: 'Outros', orcado: 500, realizado: 0 },
+    ],
+    gastos: [
+      { tipo: 'Fixo', categoria: 'Moradia', orcado: 1000, realizado: 1000 },
+      { tipo: 'Automático', categoria: 'Alimentação', orcado: 400, realizado: 320 },
+      { tipo: 'Variável', categoria: 'Alimentação', orcado: 400, realizado: 330 },
+      { tipo: 'Variável', categoria: 'Transporte', orcado: 400, realizado: 320 },
+      { tipo: 'Variável', categoria: 'Lazer', orcado: 300, realizado: 340 },
+    ],
+    insights: {
+      mediaDiariaRestante: 73.33, mediaDiariaGasta: 70,
+      previsaoFinal: 3050, diasRestantes: 15,
+      maiorGasto: { categoria: 'Moradia', realizado: 1000 },
+      estourarOrcamento: false
+    },
+    meta: { atualizadoEm: new Date().toISOString() }
+  }, true);
+}
+
+function renderAll(data, isDemo = false) {
+  renderHero(data.resumo, data.insights);
+  renderStats(data.resumo, data.insights);
+  renderBarChart(data.categorias);
+  renderPieChart(data.tipos);
+  renderTable(data.gastos);
+  renderInsights(data.resumo, data.insights, data.categorias);
+  const dt = new Date(data.meta?.atualizadoEm || Date.now());
+  document.getElementById('last-update').textContent =
+    (isDemo ? '📊 DEMO · ' : '') +
+    dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderHero(resumo, insights) {
+  const { orcado, realizado, saldo, percentual } = resumo;
+  const el = document.getElementById('hero-saldo');
+  const cls = percentual >= 100 ? 'danger' : percentual >= 80 ? 'warning' : 'positive';
+  el.className = 'hero-value ' + cls;
+  el.textContent = fmt(saldo);
+  document.getElementById('hero-meta').innerHTML =
+    `de <strong>${fmt(orcado)}</strong> orçados · gastou <strong>${fmt(realizado)}</strong>`;
+  const fill = document.getElementById('progress-fill');
+  const pctEl = document.getElementById('progress-pct');
+  const barCls = percentual >= 100 ? 'danger' : percentual >= 80 ? 'warn' : 'ok';
+  fill.className = 'progress-bar-fill ' + barCls;
+  pctEl.className = 'progress-pct ' + barCls;
+  pctEl.textContent = percentual + '%';
+  setTimeout(() => { fill.style.width = Math.min(percentual, 100) + '%'; }, 100);
+}
+
+function renderStats(resumo, insights) {
+  document.getElementById('stat-orcado').textContent = fmt(resumo.orcado);
+  document.getElementById('stat-realizado').textContent = fmt(resumo.realizado);
+  document.getElementById('stat-media').textContent = fmt(insights.mediaDiariaRestante);
+  document.getElementById('stat-dias').textContent = insights.diasRestantes + ' dias restantes';
+  const prev = document.getElementById('stat-previsao');
+  const ok = insights.previsaoFinal <= resumo.orcado;
+  prev.textContent = fmt(insights.previsaoFinal);
+  prev.style.color = ok ? 'var(--green)' : 'var(--red)';
+  document.getElementById('stat-previsao-sub').textContent = ok ? '✓ dentro do orçamento' : '⚠ acima do orçamento';
+}
+
+function renderBarChart(categorias) {
+  const ctx = document.getElementById('chart-bar').getContext('2d');
+  if (chartBar) chartBar.destroy();
+  const top = (categorias || []).slice(0, 8);
+  const labels = top.map(c => c.nome);
+  const orcado = top.map(c => c.orcado);
+  const realizado = top.map(c => c.realizado);
+
+  chartBar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Orçado', data: orcado, backgroundColor: 'rgba(107,159,255,0.25)', borderColor: 'rgba(107,159,255,0.8)', borderWidth: 1.5, borderRadius: 5 },
+        { label: 'Realizado', data: realizado,
+          backgroundColor: realizado.map((v, i) => v > orcado[i] ? 'rgba(239,68,68,0.6)' : 'rgba(124,255,212,0.5)'),
+          borderColor: realizado.map((v, i) => v > orcado[i] ? 'rgba(239,68,68,0.9)' : 'rgba(124,255,212,0.9)'),
+          borderWidth: 1.5, borderRadius: 5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#7a8099', font: { family: 'Space Mono', size: 10 }, boxWidth: 12 } },
+        tooltip: { backgroundColor: '#1c2030', titleColor: '#e8ecf4', bodyColor: '#7a8099', borderColor: '#242840', borderWidth: 1, callbacks: { label: c => ' ' + fmt(c.raw) } }
+      },
+      scales: {
+        x: { ticks: { color: '#7a8099', font: { size: 9, family: 'Space Mono' }, maxRotation: 35 }, grid: { color: 'rgba(36,40,64,0.5)' } },
+        y: { ticks: { color: '#7a8099', font: { size: 9, family: 'Space Mono' }, callback: v => 'R$' + (v/1000).toFixed(1) + 'k' }, grid: { color: 'rgba(36,40,64,0.5)' } }
+      }
+    }
+  });
+}
+
+function renderPieChart(tipos) {
+  const ctx = document.getElementById('chart-pie').getContext('2d');
+  if (chartPie) chartPie.destroy();
+  const labels = ['Fixo', 'Variável', 'Automático'];
+  const values = [tipos.fixo || 0, tipos.variavel || 0, tipos.automatico || 0];
+  const colors = ['rgba(107,159,255,0.8)', 'rgba(255,209,102,0.8)', 'rgba(124,255,212,0.8)'];
+
+  chartPie = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#141720', borderWidth: 3, hoverOffset: 8 }] },
+    options: {
+      responsive: true, cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#1c2030', titleColor: '#e8ecf4', bodyColor: '#7a8099', borderColor: '#242840', borderWidth: 1, callbacks: { label: c => ' ' + fmt(c.raw) } }
+      }
+    }
+  });
+
+  document.getElementById('pie-legend').innerHTML = labels.map((l, i) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${colors[i]}"></div>
+      <span>${l}: ${fmt(values[i])}</span>
+    </div>`).join('');
+}
+
+function renderTable(gastos) {
+  const body = document.getElementById('table-body');
+  if (!gastos || gastos.length === 0) {
+    body.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhum dado encontrado.</td></tr>';
+    return;
+  }
+  body.innerHTML = gastos.map(g => {
+    const over = g.realizado > g.orcado && g.orcado > 0;
+    const tipoNorm = (g.tipo || '').toLowerCase();
+    const badgeCls = tipoNorm.includes('fix') ? 'fixo' : tipoNorm.includes('var') ? 'variavel' : tipoNorm.includes('auto') || tipoNorm.includes('cart') ? 'automatico' : 'outro';
+    return `<tr class="${over ? 'over-budget' : ''}">
+      <td><span class="tipo-badge ${badgeCls}">${g.tipo || '—'}</span></td>
+      <td style="color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis">${g.categoria || '—'}</td>
+      <td style="color:var(--text2)">${fmt(g.orcado)}</td>
+      <td class="real-val" style="color:${over ? 'var(--red)' : 'var(--green)'}">${fmt(g.realizado)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderInsights(resumo, insights, categorias) {
+  const { orcado, realizado, saldo, percentual } = resumo;
+  const list = [];
+
+  if (saldo > 0) {
+    list.push({ icon: '✅', text: `Você ainda pode gastar <strong>${fmt(saldo)}</strong> este mês. Está usando <strong>${percentual}%</strong> do orçamento.` });
+  } else {
+    list.push({ icon: '🚨', text: `Orçamento estourado em <span class="danger">${fmt(Math.abs(saldo))}</span>! Revise seus gastos urgentemente.` });
+  }
+
+  if (insights.estourarOrcamento) {
+    list.push({ icon: '⚠️', text: `Previsão de encerramento: <span class="warn">${fmt(insights.previsaoFinal)}</span>, acima do orçado (${fmt(orcado)}). Reduza os gastos variáveis.` });
+  } else {
+    list.push({ icon: '📈', text: `Ritmo atual: <strong>${fmt(insights.mediaDiariaGasta)}/dia</strong>. Previsão de encerramento em <strong>${fmt(insights.previsaoFinal)}</strong>.` });
+  }
+
+  if (insights.diasRestantes > 0) {
+    list.push({ icon: '📅', text: `Faltam <strong>${insights.diasRestantes} dias</strong>. Você pode gastar até <strong>${fmt(insights.mediaDiariaRestante)}/dia</strong> sem estourar o orçamento.` });
+  }
+
+  if (insights.maiorGasto) {
+    list.push({ icon: '🏆', text: `Maior gasto: <strong>${insights.maiorGasto.categoria || insights.maiorGasto.tipo}</strong> com <strong>${fmt(insights.maiorGasto.realizado)}</strong>.` });
+  }
+
+  if (categorias) {
+    const acima = categorias.filter(c => c.realizado > c.orcado && c.orcado > 0);
+    if (acima.length > 0) {
+      list.push({ icon: '❗', text: `Categorias acima do orçado: <span class="warn">${acima.map(c => c.nome).join(', ')}</span>. Considere revisar esses gastos.` });
+    }
+  }
+
+  document.getElementById('insights-list').innerHTML = list.map(i => `
+    <div class="insight-card">
+      <div class="insight-icon">${i.icon}</div>
+      <div class="insight-text">${i.text}</div>
+    </div>`).join('');
+}
+
+window.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
