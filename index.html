@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💰 Controle Financeiro Mensal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f14; --surface:#161920; --surface2:#1e222d; --border:#2a2f3d;
+  --accent:#6ee7b7; --accent2:#f59e0b; --text:#e2e8f0; --muted:#64748b;
+  --good:#6ee7b7; --warn:#fbbf24; --bad:#f87171; --blue:#60a5fa; --purple:#a78bfa;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4;}
+.app{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:16px;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 24px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,4vw,1.4rem);letter-spacing:-.03em;display:flex;align-items:center;gap:8px;}
+.logo span{color:var(--accent);}
+.header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.month-selector{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:.875rem;color:var(--text);}
+.month-selector select{background:transparent;border:none;color:var(--text);font-size:.875rem;font-family:inherit;cursor:pointer;outline:none;-webkit-appearance:none;}
+.btn{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 13px;border-radius:10px;font-family:inherit;font-size:.8rem;cursor:pointer;transition:background .2s;}
+.btn:hover{background:var(--border);}
+
+/* STATUS */
+#status-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:9px 16px;display:flex;align-items:center;gap:8px;margin-bottom:18px;font-size:.8rem;color:var(--muted);}
+#status-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:pulse 2s infinite;flex-shrink:0;}
+#status-bar.loading .dot{background:var(--blue);}
+#status-bar.ok .dot{background:var(--accent);}
+#status-bar.error .dot{background:var(--bad);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+@media(max-width:520px){.kpi-grid{grid-template-columns:1fr;}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;position:relative;overflow:hidden;transition:transform .2s;}
+.kpi:hover{transform:translateY(-2px);}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0;}
+.kpi.total::after{background:var(--blue);}
+.kpi.gasto::after{background:var(--accent2);}
+.kpi.saldo::after{background:var(--accent);}
+.kpi-label{font-size:.7rem;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;}
+.kpi-value{font-family:'Syne',sans-serif;font-size:clamp(1rem,3.5vw,1.45rem);font-weight:700;letter-spacing:-.03em;line-height:1;}
+.kpi.total .kpi-value{color:var(--blue);}
+.kpi.gasto .kpi-value{color:var(--accent2);}
+.kpi.saldo .kpi-value{color:var(--accent);}
+.kpi-sub{font-size:.72rem;color:var(--muted);margin-top:5px;}
+
+/* HEALTH BANNER */
+#health-banner{border-radius:14px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:10px;font-size:.875rem;font-weight:500;border:1px solid transparent;}
+#health-banner.great{background:rgba(110,231,183,.08);border-color:rgba(110,231,183,.3);color:var(--good);}
+#health-banner.warn{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.3);color:var(--warn);}
+#health-banner.danger{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3);color:var(--bad);}
+
+/* ══ VARIÁVEIS HERO ══ */
+.var-hero{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:22px;margin-bottom:16px;}
+.var-hero-title{font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:6px;}
+.var-big-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;}
+@media(max-width:480px){.var-big-row{grid-template-columns:1fr 1fr;}}
+.var-stat{text-align:center;padding:14px 8px;background:var(--surface2);border-radius:14px;border:1px solid var(--border);}
+.var-stat-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;}
+.var-stat-val{font-family:'Syne',sans-serif;font-size:clamp(.95rem,3vw,1.25rem);font-weight:700;}
+.var-stat-val.blue{color:var(--blue);}
+.var-stat-val.orange{color:var(--accent2);}
+.var-stat-val.green{color:var(--accent);}
+.var-stat-val.red{color:var(--bad);}
+
+/* DONUT RESTANTE */
+.var-donut-row{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center;margin-bottom:20px;}
+@media(max-width:500px){.var-donut-row{grid-template-columns:1fr;};}
+.var-donut-wrap{position:relative;width:160px;margin:0 auto;}
+.var-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+.var-donut-pct{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;line-height:1;}
+.var-donut-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+
+/* BARS POR ITEM VARIÁVEL */
+.var-items-list{}
+.var-item{display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:12px;align-items:center;}
+.var-item-top{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;}
+.var-item-name{font-size:.85rem;font-weight:500;}
+.var-item-vals{font-size:.72rem;color:var(--muted);}
+.var-item-rest{font-size:.75rem;font-weight:600;}
+.var-item-rest.ok{color:var(--accent);}
+.var-item-rest.warn{color:var(--warn);}
+.var-item-rest.bad{color:var(--bad);}
+.track{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;grid-column:1/-1;}
+.track-fill{height:100%;border-radius:99px;transition:width .9s cubic-bezier(.34,1.56,.64,1);}
+.fill-green{background:var(--accent);}
+.fill-yellow{background:var(--warn);}
+.fill-red{background:var(--bad);}
+
+/* CHART BARRAS VARIÁVEIS */
+.chart-var-box{background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:20px;}
+.chart-var-box canvas{max-height:200px;}
+
+/* SECTION GENÉRICA */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;}
+.section-title{font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+
+/* PROGRESS GRUPOS */
+.progress-item{margin-bottom:13px;}
+.progress-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;}
+.progress-name{font-size:.85rem;font-weight:500;}
+.progress-values{font-size:.72rem;color:var(--muted);}
+.progress-track{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.34,1.56,.64,1);}
+
+/* MINI CHARTS ROW */
+.mini-charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+@media(max-width:540px){.mini-charts{grid-template-columns:1fr;}}
+.mini-chart-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;}
+.mini-chart-box canvas{max-height:190px;}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.82rem;}
+th{text-align:left;padding:7px 10px;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.tag{display:inline-block;font-size:.65rem;padding:2px 7px;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.tag-fixo{background:rgba(96,165,250,.15);color:var(--blue);}
+.tag-var{background:rgba(251,191,36,.15);color:var(--warn);}
+.tag-debito{background:rgba(167,139,250,.15);color:var(--purple);}
+.val-ok{color:var(--accent);}
+.val-zero{color:var(--muted);}
+.val-warn{color:var(--warn);}
+.val-bad{color:var(--bad);}
+
+/* SPIN */
+.spin{animation:spin 1s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:100%;max-width:460px;}
+.modal h2{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;margin-bottom:6px;}
+.modal p{color:var(--muted);font-size:.825rem;margin-bottom:20px;line-height:1.5;}
+.modal label{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;}
+.modal input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:inherit;font-size:.875rem;margin-bottom:16px;outline:none;transition:border-color .2s;}
+.modal input:focus{border-color:var(--accent);}
+.modal-btns{display:flex;gap:10px;}
+.btn-primary{flex:1;background:var(--accent);color:#0d0f14;border:none;border-radius:10px;padding:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:.875rem;cursor:pointer;transition:opacity .2s;}
+.btn-primary:hover{opacity:.85;}
+.btn-ghost{flex:1;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:.875rem;cursor:pointer;}
+footer{text-align:center;padding:20px 0 14px;color:var(--muted);font-size:.73rem;}
+</style>
+</head>
+<body>
+
+<!-- MODAL CONFIG -->
+<div class="modal-overlay open" id="config-modal">
+  <div class="modal">
+    <h2>⚙️ Configuração</h2>
+    <p>Cole a URL do seu Google Apps Script para conectar à planilha.</p>
+    <label>URL do Apps Script</label>
+    <input type="text" id="input-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"/>
+    <div class="modal-btns">
+      <button class="btn-primary" onclick="saveConfig()">Salvar e Conectar</button>
+      <button class="btn-ghost" onclick="useDemoData()">Ver Demo</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">💰 <span>Controle</span> Financeiro</div>
+    <div class="header-actions">
+      <div class="month-selector">📅 <select id="month-sel" onchange="loadData()"></select></div>
+      <button class="btn" id="btn-refresh" onclick="loadData()">↻ Atualizar</button>
+      <button class="btn" onclick="openConfig()">⚙️</button>
+    </div>
+  </header>
+
+  <!-- STATUS -->
+  <div id="status-bar"><div class="dot"></div><span id="status-msg">Aguardando configuração...</span></div>
+
+  <!-- KPIs GERAIS -->
+  <div class="kpi-grid">
+    <div class="kpi total">
+      <div class="kpi-label">Total Orçado</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub">mês completo</div>
+    </div>
+    <div class="kpi gasto">
+      <div class="kpi-label">Total Gasto</div>
+      <div class="kpi-value" id="kpi-gasto">—</div>
+      <div class="kpi-sub" id="kpi-gasto-pct">—% do orçamento</div>
+    </div>
+    <div class="kpi saldo">
+      <div class="kpi-label">Saldo Restante</div>
+      <div class="kpi-value" id="kpi-saldo">—</div>
+      <div class="kpi-sub" id="kpi-saldo-pct">— disponível</div>
+    </div>
+  </div>
+
+  <!-- HEALTH -->
+  <div id="health-banner" class="great">
+    <span id="health-icon">✅</span>
+    <span id="health-msg">Carregando análise...</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--   BLOCO PRINCIPAL: DESPESAS VARIÁVEIS      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="var-hero">
+    <div class="var-hero-title">📊 Despesas Variáveis — quanto ainda posso gastar?</div>
+
+    <!-- 3 números rápidos -->
+    <div class="var-big-row">
+      <div class="var-stat">
+        <div class="var-stat-label">Orçado</div>
+        <div class="var-stat-val blue" id="var-orc">—</div>
+      </div>
+      <div class="var-stat">
+        <div class="var-stat-label">Gasto</div>
+        <div class="var-stat-val orange" id="var-pago">—</div>
+      </div>
+      <div class="var-stat">
+        <div class="var-stat-label">Disponível</div>
+        <div class="var-stat-val" id="var-rest">—</div>
+      </div>
+    </div>
+
+    <!-- Donut + legenda -->
+    <div class="var-donut-row">
+      <div class="var-donut-wrap">
+        <canvas id="chart-var-donut"></canvas>
+        <div class="var-donut-center">
+          <div class="var-donut-pct" id="var-donut-pct">—</div>
+          <div class="var-donut-lbl">utilizado</div>
+        </div>
+      </div>
+      <!-- Barras por categoria variável -->
+      <div class="var-items-list" id="var-items-list"></div>
+    </div>
+
+    <!-- Gráfico horizontal de barras variáveis -->
+    <div class="chart-var-box">
+      <canvas id="chart-var-bar"></canvas>
+    </div>
+  </div>
+
+  <!-- MINI CHARTS: geral -->
+  <div class="mini-charts">
+    <div class="mini-chart-box">
+      <div class="section-title">🥧 Orçado vs Gasto (geral)</div>
+      <canvas id="chart-donut"></canvas>
+    </div>
+    <div class="mini-chart-box">
+      <div class="section-title">📈 Por grupo</div>
+      <canvas id="chart-bar"></canvas>
+    </div>
+  </div>
+
+  <!-- PROGRESSO POR GRUPO -->
+  <div class="section">
+    <div class="section-title">⚡ Progresso por grupo</div>
+    <div id="progress-list"></div>
+  </div>
+
+  <!-- TABELA DETALHADA -->
+  <div class="section">
+    <div class="section-title">📋 Detalhamento completo</div>
+    <div class="table-wrap">
+      <table id="detail-table">
+        <thead>
+          <tr><th>Categoria</th><th>Tipo</th><th>Orçado</th><th>Pago</th><th>Restante</th></tr>
+        </thead>
+        <tbody id="detail-body"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>Atualizado em <span id="updated-at">—</span></footer>
+</div>
+
+<script>
+const STORAGE_KEY = 'cf_script_url';
+let SCRIPT_URL = localStorage.getItem(STORAGE_KEY) || '';
+let chartDonut, chartBar, chartVarDonut, chartVarBar;
+
+// ── MESES ──────────────────────────────────────────────────────
+function populateMonths() {
+  const sel = document.getElementById('month-sel');
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now = new Date();
+  sel.innerHTML = '';
+  months.forEach((m, i) => {
+    const o = document.createElement('option');
+    o.value = i + 1;
+    o.textContent = m + ' ' + now.getFullYear();
+    sel.appendChild(o);
+  });
+  sel.value = now.getMonth() + 1;
+}
+
+// ── STATUS ─────────────────────────────────────────────────────
+function setStatus(state, msg) {
+  const bar = document.getElementById('status-bar');
+  bar.className = state;
+  document.getElementById('status-msg').textContent = msg;
+}
+
+// ── CONFIG MODAL ───────────────────────────────────────────────
+function openConfig() {
+  document.getElementById('input-url').value = SCRIPT_URL;
+  document.getElementById('config-modal').classList.add('open');
+}
+function saveConfig() {
+  const url = document.getElementById('input-url').value.trim();
+  if (!url) { alert('Cole a URL do Apps Script.'); return; }
+  SCRIPT_URL = url;
+  localStorage.setItem(STORAGE_KEY, url);
+  document.getElementById('config-modal').classList.remove('open');
+  loadData();
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadData() {
+  if (!SCRIPT_URL) return;
+  const month = document.getElementById('month-sel').value;
+  const btn = document.getElementById('btn-refresh');
+  btn.innerHTML = '<span class="spin">↻</span>';
+  btn.disabled = true;
+  setStatus('loading', 'Buscando dados da planilha...');
+  try {
+    const res = await fetch(`${SCRIPT_URL}?mes=${month}`, { mode: 'cors' });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    renderDashboard(json);
+    setStatus('ok', 'Dados atualizados ✓');
+  } catch (e) {
+    setStatus('error', 'Erro: ' + e.message);
+  } finally {
+    btn.innerHTML = '↻ Atualizar';
+    btn.disabled = false;
+  }
+}
+
+// ── DEMO ───────────────────────────────────────────────────────
+function useDemoData() {
+  document.getElementById('config-modal').classList.remove('open');
+  setStatus('ok', 'Modo demonstração');
+  renderDashboard({
+    mes: 5,
+    grupos: [
+      { nome:'Débito Automático', orcado:385.49, pago:320,
+        itens:[{categoria:'Wine',orcado:45.57,pago:0},{categoria:'Academia',orcado:139.98,pago:0},
+               {categoria:'iCloud',orcado:29.99,pago:0},{categoria:'Internet',orcado:90,pago:20},
+               {categoria:'iFood',orcado:4.95,pago:300},{categoria:'Celular',orcado:75.01,pago:0}]},
+      { nome:'Despesas Fixas', orcado:4151, pago:1760,
+        itens:[{categoria:'Aluguel',orcado:1500,pago:1500},{categoria:'Plano',orcado:710,pago:20},
+               {categoria:'Condomínio',orcado:1330,pago:30},{categoria:'Água',orcado:200,pago:10},
+               {categoria:'Luz',orcado:200,pago:200},{categoria:'MEI',orcado:86,pago:0},
+               {categoria:'TV',orcado:50,pago:0},{categoria:'Celular',orcado:75.01,pago:0}]},
+      { nome:'Despesas Variáveis', orcado:4650, pago:820,
+        itens:[{categoria:'Transporte',orcado:450,pago:120},{categoria:'Lazer',orcado:400,pago:250},
+               {categoria:'Mercado',orcado:1700,pago:380},{categoria:'Saúde Geral',orcado:200,pago:70},
+               {categoria:'Outros',orcado:400,pago:0},{categoria:'Investimentos',orcado:600,pago:600},
+               {categoria:'Dízimo',orcado:900,pago:0}]}
+    ]
+  });
+}
+
+// ── HELPERS ────────────────────────────────────────────────────
+function fmt(v) {
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function pct(g, o) { return o ? Math.min(Math.round(g/o*100), 100) : 0; }
+function fillCls(p) { return p<=60?'fill-green':p<=85?'fill-yellow':'fill-red'; }
+function restCls(p) { return p<=60?'ok':p<=85?'warn':'bad'; }
+
+// ── RENDER ─────────────────────────────────────────────────────
+function renderDashboard(data) {
+  const totalOrc  = data.grupos.reduce((s,g) => s+g.orcado, 0);
+  const totalPago = data.grupos.reduce((s,g) => s+g.pago,   0);
+  const saldo     = totalOrc - totalPago;
+  const pctGasto  = pct(totalPago, totalOrc);
+
+  // ── KPIs gerais
+  document.getElementById('kpi-total').textContent = fmt(totalOrc);
+  document.getElementById('kpi-gasto').textContent = fmt(totalPago);
+  document.getElementById('kpi-gasto-pct').textContent = pctGasto + '% do orçamento';
+  document.getElementById('kpi-saldo').textContent = fmt(saldo);
+  document.getElementById('kpi-saldo-pct').textContent = (100-pctGasto) + '% disponível';
+
+  // ── Health banner (baseado nas variáveis, o que importa para você)
+  const gVar = data.grupos.find(g => g.nome.toLowerCase().includes('vari')) || data.grupos[2];
+  const pctVar = pct(gVar.pago, gVar.orcado);
+  const banner = document.getElementById('health-banner');
+  const icon   = document.getElementById('health-icon');
+  const msg    = document.getElementById('health-msg');
+  banner.className = '';
+  if (pctVar <= 50) {
+    banner.classList.add('great'); icon.textContent = '✅';
+    msg.textContent = `Ótimo! Você usou só ${pctVar}% das suas despesas variáveis. Ainda tem ${fmt(gVar.orcado - gVar.pago)} livre!`;
+  } else if (pctVar <= 80) {
+    banner.classList.add('warn'); icon.textContent = '⚠️';
+    msg.textContent = `Atenção: ${pctVar}% das despesas variáveis utilizadas. Restam ${fmt(gVar.orcado - gVar.pago)}.`;
+  } else {
+    banner.classList.add('danger'); icon.textContent = '🚨';
+    msg.textContent = `Alerta! ${pctVar}% das variáveis já gastas. Apenas ${fmt(gVar.orcado - gVar.pago)} restando!`;
+  }
+
+  // ══════════════════════════════════════════
+  //   BLOCO VARIÁVEIS
+  // ══════════════════════════════════════════
+  const varOrc  = gVar.orcado;
+  const varPago = gVar.pago;
+  const varRest = varOrc - varPago;
+  const varPct  = pct(varPago, varOrc);
+
+  document.getElementById('var-orc').textContent  = fmt(varOrc);
+  document.getElementById('var-pago').textContent = fmt(varPago);
+  const restEl = document.getElementById('var-rest');
+  restEl.textContent = fmt(varRest);
+  restEl.className = 'var-stat-val ' + (varPct<=60?'green':varPct<=85?'warn':'red');
+  document.getElementById('var-donut-pct').textContent = varPct + '%';
+
+  // Donut variáveis
+  const vdCtx = document.getElementById('chart-var-donut').getContext('2d');
+  if (chartVarDonut) chartVarDonut.destroy();
+  const donutColor = varPct<=60?'#6ee7b7':varPct<=85?'#fbbf24':'#f87171';
+  chartVarDonut = new Chart(vdCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Gasto','Disponível'],
+      datasets: [{ data:[varPago, varRest], backgroundColor:[donutColor,'#1e222d'], borderWidth:0, hoverOffset:4 }]
+    },
+    options: {
+      cutout:'72%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx => ' '+fmt(ctx.parsed) } }
+      }
+    }
+  });
+
+  // Barras por item variável
+  const list = document.getElementById('var-items-list');
+  list.innerHTML = '';
+  gVar.itens.forEach(item => {
+    const p = pct(item.pago, item.orcado);
+    const rest = item.orcado - item.pago;
+    list.innerHTML += `
+      <div class="var-item">
+        <div class="var-item-top">
+          <span class="var-item-name">${item.categoria}</span>
+          <span class="var-item-vals">${fmt(item.pago)} / ${fmt(item.orcado)}</span>
+        </div>
+        <div class="track"><div class="track-fill ${fillCls(p)}" style="width:${p}%"></div></div>
+      </div>`;
+  });
+
+  // Gráfico barras horizontal variáveis
+  const vbCtx = document.getElementById('chart-var-bar').getContext('2d');
+  if (chartVarBar) chartVarBar.destroy();
+  chartVarBar = new Chart(vbCtx, {
+    type: 'bar',
+    data: {
+      labels: gVar.itens.map(i => i.categoria),
+      datasets: [
+        { label:'Orçado', data: gVar.itens.map(i=>i.orcado),
+          backgroundColor:'rgba(96,165,250,0.25)', borderColor:'#60a5fa', borderWidth:1.5, borderRadius:5 },
+        { label:'Gasto',  data: gVar.itens.map(i=>i.pago),
+          backgroundColor: gVar.itens.map(i => {
+            const p = pct(i.pago,i.orcado);
+            return p<=60?'rgba(110,231,183,0.6)':p<=85?'rgba(251,191,36,0.6)':'rgba(248,113,113,0.6)';
+          }),
+          borderColor: gVar.itens.map(i => {
+            const p = pct(i.pago,i.orcado);
+            return p<=60?'#6ee7b7':p<=85?'#fbbf24':'#f87171';
+          }),
+          borderWidth:1.5, borderRadius:5 }
+      ]
+    },
+    options: {
+      plugins:{
+        legend:{ labels:{color:'#94a3b8',font:{size:11},boxWidth:12} },
+        tooltip:{ callbacks:{ label: ctx=>' '+fmt(ctx.parsed.y) } }
+      },
+      scales:{
+        x:{ ticks:{color:'#64748b',font:{size:10}}, grid:{display:false} },
+        y:{ ticks:{color:'#64748b',font:{size:10},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}, grid:{color:'rgba(255,255,255,0.04)'} }
+      }
+    }
+  });
+
+  // ── Donut geral
+  const dCtx = document.getElementById('chart-donut').getContext('2d');
+  if (chartDonut) chartDonut.destroy();
+  chartDonut = new Chart(dCtx, {
+    type:'doughnut',
+    data:{ labels:['Gasto','Restante'],
+      datasets:[{data:[totalPago,saldo],backgroundColor:['#f59e0b','#6ee7b7'],borderWidth:0,hoverOffset:6}]
+    },
+    options:{cutout:'70%',plugins:{
+      legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12}},
+      tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.parsed)}}
+    }}
+  });
+
+  // ── Bar geral por grupo
+  const bCtx = document.getElementById('chart-bar').getContext('2d');
+  if (chartBar) chartBar.destroy();
+  chartBar = new Chart(bCtx, {
+    type:'bar',
+    data:{
+      labels: data.grupos.map(g=>g.nome.replace('Despesas ','').replace('Débito Automático','Débito')),
+      datasets:[
+        {label:'Orçado',data:data.grupos.map(g=>g.orcado),backgroundColor:'rgba(96,165,250,0.25)',borderColor:'#60a5fa',borderWidth:1.5,borderRadius:5},
+        {label:'Pago',  data:data.grupos.map(g=>g.pago),  backgroundColor:'rgba(251,191,36,0.5)', borderColor:'#fbbf24',borderWidth:1.5,borderRadius:5}
+      ]
+    },
+    options:{
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.parsed.y)}}},
+      scales:{
+        x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#64748b',font:{size:10},callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+
+  // ── Progresso grupos
+  const progList = document.getElementById('progress-list');
+  progList.innerHTML = '';
+  data.grupos.forEach(g => {
+    const p = pct(g.pago, g.orcado);
+    progList.innerHTML += `
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-name">${g.nome}</span>
+          <span class="progress-values">${fmt(g.pago)} / ${fmt(g.orcado)} · ${p}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill ${fillCls(p)}" style="width:${p}%"></div>
+        </div>
+      </div>`;
+  });
+
+  // ── Tabela
+  const tbody = document.getElementById('detail-body');
+  tbody.innerHTML = '';
+  const tags   = ['tag-debito','tag-fixo','tag-var'];
+  const labels = ['Débito','Fixo','Variável'];
+  data.grupos.forEach((g,gi) => {
+    g.itens.forEach(item => {
+      const rest = item.orcado - item.pago;
+      const p    = pct(item.pago, item.orcado);
+      let cls = item.pago===0?'val-zero':p<60?'val-ok':p<90?'val-warn':'val-bad';
+      tbody.innerHTML += `
+        <tr>
+          <td>${item.categoria}</td>
+          <td><span class="tag ${tags[gi]}">${labels[gi]}</span></td>
+          <td>${fmt(item.orcado)}</td>
+          <td class="${cls}">${fmt(item.pago)}</td>
+          <td class="${rest<0?'val-bad':rest===item.orcado?'val-zero':'val-ok'}">${fmt(rest)}</td>
+        </tr>`;
+    });
+  });
+
+  document.getElementById('updated-at').textContent = new Date().toLocaleString('pt-BR');
+}
+
+// ── INIT ───────────────────────────────────────────────────────
+populateMonths();
+if (SCRIPT_URL) {
+  document.getElementById('config-modal').classList.remove('open');
+  loadData();
+}
+</script>
+</body>
+</html>
